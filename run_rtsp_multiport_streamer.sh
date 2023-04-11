@@ -17,9 +17,9 @@ done
 
 # Ports list:
 # Change lower ports and port range here:
-firstBroadcastPort=7660
-firstInternalPort=8100
-portsRange=60
+firstBroadcastPort=50000
+firstInternalPort=51000
+portsRange=30
 
 # Max port value calculate:
 lastBroadcastPort=$firstBroadcastPort+$portsRange
@@ -98,7 +98,7 @@ configure_ffserver
 
 # Run stream:
 server_ip=$(ip address | grep inet | grep /24 | awk '{print $2}' | sed 's/\/24//g')
-echo -e "Running RTSP streamer (rtsp://${server_ip}:${freeOuterPort}/test) for $wait_seconds seconds.\n\n"
+echo -e "Running RTSP streamer on (rtsp://${server_ip}:${freeOuterPort}/test)"
 $FFSERVER_CMD -f $ffserver_cfg
 
 # Kill streams on exit:

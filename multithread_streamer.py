@@ -6,9 +6,12 @@ import shutil
 import os
 import re
 import subprocess
+import time
+
+from concurrent.futures import ThreadPoolExecutor
 
 # Requirements:
-import ffmpeg
+# import ffmpeg
 
 
 ####################################
@@ -103,6 +106,8 @@ if re.search("/$", args_file_path):
     args_file_path = re.sub("/$", "", args_file_path)
     print(f"INFO: args_file_path: {args_file_path}")
 ####################################
+ALLOWED_FORMATS = ["mp4"]
+####################################
 
 
 def unzip_file(
@@ -140,16 +145,16 @@ def read_dir_content(
 
     if workspace == dir_name:
         print(
-            f"ERROR: workspace cant be equal to source directory! (workspace:{workspace}, source_dir:{dir_name})"
+            f"ERROR: Workspace cant be equal to source directory! (workspace:{workspace}, source_dir:{dir_name})"
         )
     elif workspace == "./":
         new_workspace = "."
         shutil.copytree(dir_path, f"{workspace}/", dirs_exist_ok=True)
-        print(f"INFO: entire {dir_path} directory copied to {new_workspace}/")
+        print(f"INFO: Entire {dir_path} directory copied to {new_workspace}/")
     else:
         new_workspace = f"{workspace}/{dir_name}"
         shutil.copytree(dir_path, f"{workspace}/{dir_name}", dirs_exist_ok=True)
-        print(f"INFO: entire {dir_path} directory copied to {new_workspace}/")
+        print(f"INFO: Entire {dir_path} directory copied to {new_workspace}/")
 
     print(new_workspace)
     for file in dir_content:
@@ -160,20 +165,37 @@ def read_dir_content(
     return dir_content, new_workspace
 
 
+def check_extention(content: list) -> list:
+    """Check provided files extention"""
+    print(f"INFO: files list before check: {content}")
+    valid_list = []
+    for item in content:
+        print(content)
+        print(item)
+        if item.split(".")[-1] in ALLOWED_FORMATS:
+            valid_list.append(item)
+        else:
+            print(
+                f"WARN: {item} not in 'ALLOWED_FORMATS':{ALLOWED_FORMATS}. Item removed."
+            )
+    print(f"INFO: Valid files list: {valid_list}")
+    return valid_list
+
+
 def shift_sample(
     input_files: list,
     workspace: str,
     num_copies=args.num_copies,
     shift_interval=args.shift_interval,
     output_resolution=args.resolution,
-    orig_file_path=args_file_path,
-):
+) -> list:
     """
     Create output video samples from input_files list, according to copies_num.
     Default output_resolution is FullHD(1920x1080), can be changed with '-r' input key.trim
     """
     print(f"INFO: Input files: {input_files}")
     print(f"INFO: Number of copies: {num_copies}")
+    shifted_samples = []
     for input_file in input_files:
         print(f"INFO: Processing {input_file}...")
         i = 1
@@ -199,6 +221,8 @@ def shift_sample(
                 encoding="utf-8",
                 errors="replace",
             )
+            shifted_samples.append(output_file_naming)
+
             while True:
                 realtime_output = proc.stdout.readline()
 
@@ -209,9 +233,49 @@ def shift_sample(
                 if realtime_output:
                     if re.search("frame=", realtime_output):
                         print(f"INFO: {realtime_output.strip()}", flush=True, end="\r")
-
                     elif re.search(input_file, realtime_output):
                         print(f"WARN: {realtime_output.strip()}", flush=True, end="\r")
+
+    print(f"INFO: shifted ssamples list: {shifted_samples}")
+    return shifted_samples
+
+
+def get_command_list(input_files: list, workspace: str):
+    """Running multiple copies of ffserver"""
+    command_list = []
+    for item in input_files:
+        print(f"INFO: coping run_rtsp_multiport_streamer.sh to {workspace}/")
+        shutil.copy("run_rtsp_multiport_streamer.sh", workspace)
+        print(f"INFO: Launching streamer for {item}")
+        command_list.append(f"./run_rtsp_multiport_streamer.sh {item}")
+    return command_list
+
+
+def run_command(
+    command: str,
+):
+    proc = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        encoding="utf-8",
+        # errors="replace",
+        cwd="/tmp/test/",
+    )
+    while True:
+        realtime_output = proc.stdout.readline()
+
+        if realtime_output == "" and proc.poll() is not None:
+            print("", flush=True)
+            break
+
+        if realtime_output:
+            if re.search("Running RTSP streamer on", realtime_output):
+                print(f"INFO: {realtime_output.strip()}")
+
+
+# Tue Apr 11 17:08:04 2023 192.168.11.137 - - [TEARDOWN] "rtsp://192.168.11.58:7661/test/ RTSP/1.0" 200 905
 
 
 def main():
@@ -223,6 +287,7 @@ def main():
     else:
         dir_content = [os.path.basename(args.input_file_path)]
         workspace = args.workspace
+
         # Copy single file to workspace:
         if args.workspace != "./":
             shutil.copy(args.input_file_path, args.workspace)
@@ -230,25 +295,22 @@ def main():
         else:
             print(f"INFO: working in currect directory: './'")
 
-    shift_sample(dir_content, workspace)
+    valid_files = check_extention(dir_content)
+    shifted_samples = shift_sample(valid_files, workspace)
+    commands = get_command_list(shifted_samples, workspace)
+    print(f"DEBUG: Commads list : {commands}")
+    # Create a thread pool worker threads
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = []
+        # Submit each command to the thread pool
+        for cmd in commands:
+            futures.append(executor.submit(run_command, cmd))
+            time.sleep(3)
+
+        # Wait for all commands to complete
+        for future in futures:
+            future.result()
 
 
 if __name__ == "__main__":
     main()
-
-
-# HTTPPort 8100
-# HTTPBindAddress 0.0.0.0
-# MaxHTTPConnections 2000
-# MaxClients 1000
-# MaxBandwidth 5000000
-# CustomLog -
-
-# RTSPPort 7660
-# RTSPBindAddress 0.0.0.0
-
-# <Stream test>
-#     Format rtp
-#     File "tashir2K.mp4"
-# </Stream>
-###
