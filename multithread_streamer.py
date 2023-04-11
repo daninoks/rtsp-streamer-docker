@@ -273,6 +273,8 @@ def run_command(
         if realtime_output:
             if re.search("Running RTSP streamer on", realtime_output):
                 print(f"INFO: {realtime_output.strip()}")
+            elif re.search("[TEARDOWN]", realtime_output):
+                print(f"DEBUG: {realtime_output.strip()}")
 
 
 # Tue Apr 11 17:08:04 2023 192.168.11.137 - - [TEARDOWN] "rtsp://192.168.11.58:7661/test/ RTSP/1.0" 200 905

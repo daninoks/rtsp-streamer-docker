@@ -3,14 +3,14 @@
 
 videosArray=("$@")
 
-echo "INFO: videos passed:"
+# echo "INFO: videos passed:"
 for video in ${videosArray[@]}; do
   echo "$video"
 done
 
 for video in ${videosArray[@]}; do
   if ! [[ -f $video ]]; then
-    echo "Error: '$video' file does not exist."
+    echo "ERROR: '$video' file does not exist."
     exit 1
   fi
 done
@@ -63,8 +63,8 @@ function outerPorts() {
 
 innerPorts
 outerPorts
-echo "INFO: freeInerPort: $freeInerPort"
-echo "INFO: freeOuterPort: $freeOuterPort"
+# echo "INFO: freeInerPort: $freeInerPort"
+# echo "INFO: freeOuterPort: $freeOuterPort"
 
 # Stream configuration:
 test_video="$1"
