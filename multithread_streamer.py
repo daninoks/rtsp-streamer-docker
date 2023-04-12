@@ -5,13 +5,17 @@ import re
 import subprocess
 import time
 import logging
+import sys
 from concurrent.futures import ThreadPoolExecutor
+
 
 #########################################################
 ###################### Docker envs ######################
-env_num_copies = os.environ.get("NUM_COPIES") if os.environ.get("NUM_COPIES") else 1
+env_num_copies = (
+    int(os.environ.get("NUM_COPIES")) if os.environ.get("NUM_COPIES") else 1
+)
 env_shift_interval = (
-    os.environ.get("SHIFT_INTERVAL") if os.environ.get("SHIFT_INTERVAL") else 5
+    int(os.environ.get("SHIFT_INTERVAL")) if os.environ.get("SHIFT_INTERVAL") else 5
 )
 env_output_resolution = (
     os.environ.get("OUTPUT_RESOLUTION")
@@ -31,23 +35,44 @@ env_source_path = (
     if os.environ.get("SOURCE_PATH")
     else "/app/video_samples"
 )
-env_workers_num = os.environ.get("WORKERS_NUM") if os.environ.get("WORKERS_NUM") else 16
+env_workers_num = (
+    int(os.environ.get("WORKERS_NUM")) if os.environ.get("WORKERS_NUM") else 8
+)
+env_log_level = os.environ.get("LOG_LEVEL") if os.environ.get("LOG_LEVEL") else "INFO"
 #########################################################
 ######################## Logger #########################
-FORMAT = "{asctime} : {levelname} : {message}"
+FORMAT = "%(asctime)s:%(levelname)s:%(message)s"
+DOCKER_FORMAT = "%(levelname)s : %(message)s"
 # "%(asctime)s %(clientip)-15s %(user)-8s %(message)s"
 logging.basicConfig(
     filename="ffserver-versatile.log",
     filemode="w",
-    level=logging.DEBUG,
     format=FORMAT,
-    datefmt="%Y-%m-%d %I:%M:%S%p",
+    datefmt="%Y-%m-%d %I:%M:%S",
 )
 logger = logging.getLogger("ffserver-versatile")
+consoleHandler = logging.StreamHandler(sys.stdout)  # set streamhandler to stdout
+consoleHandler.setFormatter(logging.Formatter(DOCKER_FORMAT))
+logger.addHandler(consoleHandler)
+
+# logger = logging.getLogger(__name__)
+# if not logging.getLogger().handlers:
+#     handler = logging.StreamHandler()
+#     formatter = logging.Formatter("%(name)s %(levelname)s %(message)s")
+#     handler.setFormatter(formatter)
+#     logger.addHandler(handler)
+
+# Set logging level:
+if "DEBUG" == env_log_level:
+    logger.setLevel(logging.DEBUG)
+elif "INFO" == env_log_level:
+    logger.setLevel(logging.INFO)
+elif "WARN" or "WARNING" == env_log_level:
+    logger.setLevel(logging.WARNING)
 #########################################################
 
 
-def unzip_file(zip_path=env_source_path, workspace=env_workspace) -> list:
+def unzip_file(zip_path=env_source_path, workspace=env_workspace):
     """
     Unzip provided .zip to workspace
     (Default: /tmp/ in order to save space)
@@ -72,7 +97,7 @@ def unzip_file(zip_path=env_source_path, workspace=env_workspace) -> list:
     return ws_content
 
 
-def read_dir_content(source_dir_path=env_source_path, workspace=env_workspace) -> list:
+def read_dir_content(source_dir_path=env_source_path, workspace=env_workspace):
     """
     Return provided directory content. Copy to workspace
     (Default: /tmp/ in order to save space)
@@ -104,9 +129,9 @@ def read_dir_content(source_dir_path=env_source_path, workspace=env_workspace) -
     return source_dir_content
 
 
-def check_extention(content: list, allowed_extentions=env_allowed_extentions) -> list:
+def check_extention(content: list, allowed_extentions=env_allowed_extentions):
     """Check provided files extention"""
-    print(f"INFO: files list before check: {content}")
+    logger.info(f"Files list before check: {content}")
     valid_list = []
     for item in content:
         if item.split(".")[-1] in allowed_extentions:
@@ -121,11 +146,12 @@ def check_extention(content: list, allowed_extentions=env_allowed_extentions) ->
 
 def shift_sample(
     input_files: list,
+    source_path=env_source_path,
     workspace=env_workspace,
     num_copies=env_num_copies,
     shift_interval=env_shift_interval,
     output_resolution=env_output_resolution,
-) -> list:
+):
     """
     Create output video samples from input_files list, according to copies_num.
     Default output_resolution is FullHD(1920x1080), can be changed with '-r' input key.trim
@@ -144,7 +170,7 @@ def shift_sample(
                     "ffmpeg",
                     "-y",
                     "-i",
-                    f"{workspace}/{input_file}",
+                    f"{source_path}/{input_file}",
                     "-ss",
                     f"{shift_interval*i}",
                     "-vf",
@@ -179,18 +205,17 @@ def shift_sample(
     return shifted_samples
 
 
-def get_command_list(input_files: list, workspace=env_workspace) -> list:
+def get_command_list(input_files: list, workspace=env_workspace):
     """Running multiple copies of ffserver"""
     command_list = []
     for item in input_files:
-        logger.debug(f"Coping run_rtsp_multiport_streamer.sh to {workspace}/")
         shutil.copy("run_rtsp_multiport_streamer.sh", workspace)
-        logger.info(f"Launching streamer for {item}")
+        logger.debug(f"'run_rtsp_multiport_streamer.sh' copied to {workspace}/")
         command_list.append(f"./run_rtsp_multiport_streamer.sh {item}")
     return command_list
 
 
-def run_command(command: str, workspace=env_workspace) -> None:
+def run_command(command: str, workspace=env_workspace):
     """Run command construction for ThreadPoolExecutor"""
     proc = subprocess.Popen(
         command,
@@ -198,14 +223,13 @@ def run_command(command: str, workspace=env_workspace) -> None:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         encoding="utf-8",
-        # errors="replace",
-        cwd=workspace,
+        errors="replace",
+        cwd=f"{workspace}/",
     )
     while True:
         realtime_output = proc.stdout.readline()
 
         if realtime_output == "" and proc.poll() is not None:
-            print("", flush=True)
             break
 
         if realtime_output:
@@ -217,8 +241,18 @@ def run_command(command: str, workspace=env_workspace) -> None:
 
 def main(
     source_path=env_source_path, workspace=env_workspace, workers_num=env_workers_num
-) -> None:
+):
     """Main func info here"""
+    try:
+        # os.mkdir(workspace)
+        if os.listdir(source_path) == []:
+            logger.error("No smaples provided. Exiting...")
+            sys.exit(1)
+    except Exception as err:
+        logger.error(err)
+        logger.error("No smaples provided. Exiting...")
+        sys.exit(1)
+
     if os.path.isdir(source_path):
         dir_content = read_dir_content()
     elif os.path.splitext(os.path.basename(source_path))[1] == ".zip":
@@ -241,12 +275,12 @@ def main(
     commands = get_command_list(shifted_samples, workspace=workspace)
     logger.debug(f"Commads list : {commands}")
     # Create a thread pool worker threads
-    with ThreadPoolExecutor(max_workers=workers_num) as executor:
+    with ThreadPoolExecutor(max_workers=int(workers_num)) as executor:
         futures = []
         # Submit each command to the thread pool
         for cmd in commands:
-            futures.append(executor.submit(run_command, cmd))
             logger.debug(f"Executing {cmd} ...")
+            futures.append(executor.submit(run_command, cmd))
             time.sleep(3)
 
         # Wait for all commands to complete

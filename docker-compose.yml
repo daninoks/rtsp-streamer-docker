@@ -1,7 +1,7 @@
 version: "3.0"
 services:
   postgres:
-    image: my-image
+    image: ffserver-versatile:v1
     container_name: ffserver-versatile
     network_mode: "host"
     restart: always
@@ -9,11 +9,12 @@ services:
       - ./video_samples:/app/video_samples
       # - ./workspace:/app/workspace
     environment:
-      - NUM_COPIES=1
+      - LOG_LEVEL=DEBUG
+      - NUM_COPIES=5
       - SHIFT_INTERVAL=5
       - OUTPUT_RESOLUTION=1920x1080
       - ALLOWED_EXTENTIONS=mp4
       - WORKSPACE=/app/workspace
       - SOURCE_PATH=/app/video_samples
-      - WORKERS_NUM=16
+      - WORKERS_NUM=8
     command: sh -c "python3 /app/multithread_streamer.py"
