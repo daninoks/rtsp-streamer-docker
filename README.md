@@ -19,7 +19,7 @@
 version: "3.0"
 services:
   postgres:
-    image: ffserver-versatile:v1
+    image: daninoks/ffserver-versatile:v1
     container_name: ffserver-versatile
     network_mode: "host"
     restart: always
