@@ -42,3 +42,22 @@ services:
       - WORKERS_NUM=8
     command: sh -c "python3 /app/multithread_streamer.py"
 ```
+
+### Single line command:
+
+1.  `mkdir /absolute/path/to/video_samples/`
+2.  `cp {$SOURCE_FILES} /absolute/path/to/video_samples/`
+3.  ```docker run -d --name ffserver-versatile \
+     --network host \
+     -v /absolute/path/to/video_samples:/app/video_samples \
+     -e LOG_LEVEL=DEBUG \
+     -e NUM_COPIES=5 \
+     -e SHIFT_INTERVAL=5 \
+     -e OUTPUT_RESOLUTION=1920x1080 \
+     -e ALLOWED_EXTENTIONS=mp4 \
+     -e WORKSPACE=/app/workspace \
+     -e SOURCE_PATH=/app/video_samples \
+     -e WORKERS_NUM=8 \
+     daninoks/ffserver-versatile:v1 \
+     sh -c "python3 /app/multithread_streamer.py"
+    ```
