@@ -2,6 +2,11 @@
 
 ## Usage:
 
+1. Create docker-compose.yml with environments provided below.
+2. Put videos sample into {BASE_DIR}/video_samples/
+3. Pull daninoks/ffserver-versatile:v1 docker image, or just start the docker container with `docker-compose up`
+4. RTSP links will be provided in docker logs.
+
 ### Environment vars:
 
 > - LOG_LEVEL {DEBUG, WARNING, INFO}
