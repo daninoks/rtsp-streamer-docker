@@ -1,203 +1,140 @@
 import zipfile
-import argparse
-import textwrap
-import argparse
 import shutil
 import os
 import re
 import subprocess
 import time
-
+import logging
 from concurrent.futures import ThreadPoolExecutor
 
-# Requirements:
-# import ffmpeg
+#########################################################
+###################### Docker envs ######################
+env_num_copies = os.environ.get("NUM_COPIES") if os.environ.get("NUM_COPIES") else 1
+env_shift_interval = (
+    os.environ.get("SHIFT_INTERVAL") if os.environ.get("SHIFT_INTERVAL") else 5
+)
+env_output_resolution = (
+    os.environ.get("OUTPUT_RESOLUTION")
+    if os.environ.get("OUTPUT_RESOLUTION")
+    else "1920x1080"
+)
+env_allowed_extentions = (
+    os.environ.get("ALLOWED_EXTENTIONS")
+    if os.environ.get("ALLOWED_EXTENTIONS")
+    else "mp4"
+)
+env_workspace = (
+    os.environ.get("WORKSPACE") if os.environ.get("WORKSPACE") else "/app/workspace"
+)
+env_source_path = (
+    os.environ.get("SOURCE_PATH")
+    if os.environ.get("SOURCE_PATH")
+    else "/app/video_samples"
+)
+env_workers_num = os.environ.get("WORKERS_NUM") if os.environ.get("WORKERS_NUM") else 16
+#########################################################
+######################## Logger #########################
+FORMAT = "{asctime} : {levelname} : {message}"
+# "%(asctime)s %(clientip)-15s %(user)-8s %(message)s"
+logging.basicConfig(
+    filename="ffserver-versatile.log",
+    filemode="w",
+    level=logging.DEBUG,
+    format=FORMAT,
+    datefmt="%Y-%m-%d %I:%M:%S%p",
+)
+logger = logging.getLogger("ffserver-versatile")
+#########################################################
 
 
-####################################
-### Create ArgumentParser object ###
-parser = argparse.ArgumentParser(
-    description="Shift provided video samples. Strim resulting samples via FFSERVER",
-    formatter_class=argparse.RawTextHelpFormatter,
-    add_help=False,
-)
-
-# Add the arguments:
-parser.add_argument(
-    "-h",
-    "--help",
-    action="help",
-    default=argparse.SUPPRESS,
-    help=textwrap.dedent(
-        """\
-        Show this help message and exit.
-        \n"""
-    ),
-)
-parser.add_argument(
-    "-i",
-    "--input_file_path",
-    type=str,
-    required=True,
-    help=textwrap.dedent(
-        """\
-        Input .zip or dir path or even path to video file.
-        \n"""
-    ),
-)
-parser.add_argument(
-    "-n",
-    "--num_copies",
-    type=int,
-    default=1,
-    required=False,
-    help=textwrap.dedent(
-        """\
-        Number of copies of each provided sample.
-        Default int: 1
-        \n"""
-    ),
-)
-parser.add_argument(
-    "-s",
-    "--shift_interval",
-    type=int,
-    default=5,
-    required=False,
-    help=textwrap.dedent(
-        """\
-        Same videos sample shift interval.
-        Default int: 5 [sec] 
-        \n"""
-    ),
-)
-parser.add_argument(
-    "-w",
-    "--workspace",
-    type=str,
-    default="/tmp",
-    required=False,
-    help=textwrap.dedent(
-        """\
-        Can be specified relative or absolute: './path/to/workspace'.
-        Default str: '/tmp/'
-        \n"""
-    ),
-)
-parser.add_argument(
-    "-r",
-    "--resolution",
-    type=str,
-    default="1920x1080",
-    required=False,
-    help=textwrap.dedent(
-        """\
-        Output samples resolution: '{width}x{height}'.
-        Default str: '1920x1080'
-        \n"""
-    ),
-)
-
-# Parse the arguments:
-args = parser.parse_args()
-# Access the arguments:
-args_file_path = args.input_file_path
-if re.search("/$", args_file_path):
-    args_file_path = re.sub("/$", "", args_file_path)
-    print(f"INFO: args_file_path: {args_file_path}")
-####################################
-ALLOWED_FORMATS = ["mp4"]
-####################################
-
-
-def unzip_file(
-    zip_path=args_file_path, new_workspace=args.workspace
-) -> tuple[list, str]:
+def unzip_file(zip_path=env_source_path, workspace=env_workspace) -> list:
     """
-    Unzip provided .zip to args.workspace
+    Unzip provided .zip to workspace
     (Default: /tmp/ in order to save space)
     """
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_name = os.path.basename(zip_path)
-        zip_ref.extractall(f"{new_workspace}/")
-        print(f"INFO: {zip_path} unzipped to {new_workspace}/")
-        ####### TODO:
-        ####### {new_workspace}/zip_name/
+    samples_content = os.listdir(f"{zip_path}/")
+    for sample in samples_content:
+        with zipfile.ZipFile(f"{zip_path}/{sample}", "r") as zip_ref:
+            zip_ref.extractall(f"{workspace}/")
+            logger.info(f"{zip_path}/{sample} unzipped to {workspace}/")
 
-        dir_content = os.listdir(f"{new_workspace}/")
-        if os.path.isdir(f"{new_workspace}/{dir_content[0]}"):
-            new_workspace = f"{new_workspace}/{dir_content[0]}"
-            dir_content = os.listdir(f"{new_workspace}/")
-        else:
-            new_workspace = f"{new_workspace}"
-    return dir_content, new_workspace
+            ws_content = os.listdir(f"{workspace}/")
+            for ws_sample in ws_content:
+                if os.path.isdir(f"{workspace}/{ws_sample}"):
+                    shutil.copytree(
+                        f"{workspace}/{ws_sample}", workspace, dirs_exist_ok=True
+                    )
+                    logger.info(
+                        f"{workspace}/{ws_sample} content copied to {workspace}/"
+                    )
+                    shutil.rmtree(f"{workspace}/{ws_sample}")
+                    logger.info(f"{workspace}/{ws_sample} cleaned")
+    return ws_content
 
 
-def read_dir_content(
-    dir_path=args_file_path, workspace=args.workspace
-) -> tuple[list, str]:
+def read_dir_content(source_dir_path=env_source_path, workspace=env_workspace) -> list:
     """
-    Return provided directory content. Copy to args.workspace
+    Return provided directory content. Copy to workspace
     (Default: /tmp/ in order to save space)
     """
-    dir_name = os.path.basename(dir_path)
-    dir_content = os.listdir(dir_path)
+    source_dir_name = os.path.basename(source_dir_path)
+    source_dir_content = os.listdir(source_dir_path)
 
-    if workspace == dir_name:
-        print(
-            f"ERROR: Workspace cant be equal to source directory! (workspace:{workspace}, source_dir:{dir_name})"
+    if workspace == source_dir_name:
+        logger.warning(
+            f"Workspace can't be equal to source directory! (workspace:{workspace}, source_dir:{source_dir_name})"
         )
+        workspace = "/app/workspace"
+        shutil.copytree(source_dir_path, f"{workspace}/", dirs_exist_ok=True)
     elif workspace == "./":
-        new_workspace = "."
-        shutil.copytree(dir_path, f"{workspace}/", dirs_exist_ok=True)
-        print(f"INFO: Entire {dir_path} directory copied to {new_workspace}/")
+        workspace = "/app/workspace"
+        logger.warning(f"'./' selected, the workspace is '/app/workspace'")
+        shutil.copytree(source_dir_path, f"{workspace}/", dirs_exist_ok=True)
     else:
-        new_workspace = f"{workspace}/{dir_name}"
-        shutil.copytree(dir_path, f"{workspace}/{dir_name}", dirs_exist_ok=True)
-        print(f"INFO: Entire {dir_path} directory copied to {new_workspace}/")
+        shutil.copytree(
+            source_dir_path, f"{workspace}/{source_dir_name}", dirs_exist_ok=True
+        )
+        logger.info(f"Entire {source_dir_path} directory copied to {workspace}/")
 
-    print(new_workspace)
-    for file in dir_content:
-        if dir_content.index(file) == len(dir_content) - 1:
-            print(f"└── {file}")
+    for file in source_dir_content:
+        if source_dir_content.index(file) == len(source_dir_content) - 1:
+            logger.info(f"└── {file}")
         else:
-            print(f"├── {file}")
-    return dir_content, new_workspace
+            logger.info(f"├── {file}")
+    return source_dir_content
 
 
-def check_extention(content: list) -> list:
+def check_extention(content: list, allowed_extentions=env_allowed_extentions) -> list:
     """Check provided files extention"""
     print(f"INFO: files list before check: {content}")
     valid_list = []
     for item in content:
-        print(content)
-        print(item)
-        if item.split(".")[-1] in ALLOWED_FORMATS:
+        if item.split(".")[-1] in allowed_extentions:
             valid_list.append(item)
         else:
-            print(
-                f"WARN: {item} not in 'ALLOWED_FORMATS':{ALLOWED_FORMATS}. Item removed."
+            logger.warning(
+                f"{item} not in 'allowed_extentions':{allowed_extentions}. Item removed."
             )
-    print(f"INFO: Valid files list: {valid_list}")
+    logger.info(f"Valid files list: {valid_list}")
     return valid_list
 
 
 def shift_sample(
     input_files: list,
-    workspace: str,
-    num_copies=args.num_copies,
-    shift_interval=args.shift_interval,
-    output_resolution=args.resolution,
+    workspace=env_workspace,
+    num_copies=env_num_copies,
+    shift_interval=env_shift_interval,
+    output_resolution=env_output_resolution,
 ) -> list:
     """
     Create output video samples from input_files list, according to copies_num.
     Default output_resolution is FullHD(1920x1080), can be changed with '-r' input key.trim
     """
-    print(f"INFO: Input files: {input_files}")
-    print(f"INFO: Number of copies: {num_copies}")
+    logger.info(f"Input files: {input_files}")
+    logger.info(f"Number of copies: {num_copies}")
     shifted_samples = []
     for input_file in input_files:
-        print(f"INFO: Processing {input_file}...")
+        logger.info(f"Processing {input_file}...")
         i = 1
         while i <= num_copies:
             output_file_naming = f"{input_file.split('.')[0]}_{i}.mp4"
@@ -227,33 +164,34 @@ def shift_sample(
                 realtime_output = proc.stdout.readline()
 
                 if realtime_output == "" and proc.poll() is not None:
-                    print("", flush=True)
+                    # print("", flush=True)
                     break
 
                 if realtime_output:
                     if re.search("frame=", realtime_output):
-                        print(f"INFO: {realtime_output.strip()}", flush=True, end="\r")
+                        logger.info(realtime_output.strip())
+                        # print(f"INFO: {realtime_output.strip()}", flush=True, end="\r")
                     elif re.search(input_file, realtime_output):
-                        print(f"WARN: {realtime_output.strip()}", flush=True, end="\r")
+                        logger.info(realtime_output.strip())
+                        # print(f"WARN: {realtime_output.strip()}", flush=True, end="\r")
 
-    print(f"INFO: shifted ssamples list: {shifted_samples}")
+    logger.info(f"Shifted ssamples list: {shifted_samples}")
     return shifted_samples
 
 
-def get_command_list(input_files: list, workspace: str):
+def get_command_list(input_files: list, workspace=env_workspace) -> list:
     """Running multiple copies of ffserver"""
     command_list = []
     for item in input_files:
-        print(f"INFO: coping run_rtsp_multiport_streamer.sh to {workspace}/")
+        logger.debug(f"Coping run_rtsp_multiport_streamer.sh to {workspace}/")
         shutil.copy("run_rtsp_multiport_streamer.sh", workspace)
-        print(f"INFO: Launching streamer for {item}")
+        logger.info(f"Launching streamer for {item}")
         command_list.append(f"./run_rtsp_multiport_streamer.sh {item}")
     return command_list
 
 
-def run_command(
-    command: str,
-):
+def run_command(command: str, workspace=env_workspace) -> None:
+    """Run command construction for ThreadPoolExecutor"""
     proc = subprocess.Popen(
         command,
         shell=True,
@@ -261,7 +199,7 @@ def run_command(
         stderr=subprocess.PIPE,
         encoding="utf-8",
         # errors="replace",
-        cwd="/tmp/test/",
+        cwd=workspace,
     )
     while True:
         realtime_output = proc.stdout.readline()
@@ -272,41 +210,43 @@ def run_command(
 
         if realtime_output:
             if re.search("Running RTSP streamer on", realtime_output):
-                print(f"INFO: {realtime_output.strip()}")
+                logger.info(realtime_output.strip())
             elif re.search("[TEARDOWN]", realtime_output):
-                print(f"DEBUG: {realtime_output.strip()}")
+                logger.debug(realtime_output.strip())
 
 
-# Tue Apr 11 17:08:04 2023 192.168.11.137 - - [TEARDOWN] "rtsp://192.168.11.58:7661/test/ RTSP/1.0" 200 905
-
-
-def main():
+def main(
+    source_path=env_source_path, workspace=env_workspace, workers_num=env_workers_num
+) -> None:
     """Main func info here"""
-    if os.path.isdir(args.input_file_path):
-        dir_content, workspace = read_dir_content()
-    elif os.path.splitext(os.path.basename(args.input_file_path))[1] == ".zip":
-        dir_content, workspace = unzip_file()
+    if os.path.isdir(source_path):
+        dir_content = read_dir_content()
+    elif os.path.splitext(os.path.basename(source_path))[1] == ".zip":
+        dir_content = unzip_file()
     else:
-        dir_content = [os.path.basename(args.input_file_path)]
-        workspace = args.workspace
+        dir_content = os.listdir(source_path)
 
-        # Copy single file to workspace:
-        if args.workspace != "./":
-            shutil.copy(args.input_file_path, args.workspace)
-            print(f"INFO: {args.input_file_path} file copied to {args.workspace}/")
-        else:
-            print(f"INFO: working in currect directory: './'")
+        for file in dir_content:
+            # Copy standalone file(s) to workspace:
+            if workspace == "./":
+                workspace = "/app/workspace"
+                shutil.copy(f"{source_path}/{file}", workspace)
+                logger.warning(f"'./' selected, the workspace is '/app/workspace'")
+            else:
+                shutil.copy(f"{source_path}/{file}", workspace)
+                logger.info(f"{source_path}/{file} file copied to {workspace}/")
 
     valid_files = check_extention(dir_content)
-    shifted_samples = shift_sample(valid_files, workspace)
-    commands = get_command_list(shifted_samples, workspace)
-    print(f"DEBUG: Commads list : {commands}")
+    shifted_samples = shift_sample(valid_files, workspace=workspace)
+    commands = get_command_list(shifted_samples, workspace=workspace)
+    logger.debug(f"Commads list : {commands}")
     # Create a thread pool worker threads
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=workers_num) as executor:
         futures = []
         # Submit each command to the thread pool
         for cmd in commands:
             futures.append(executor.submit(run_command, cmd))
+            logger.debug(f"Executing {cmd} ...")
             time.sleep(3)
 
         # Wait for all commands to complete
