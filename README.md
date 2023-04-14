@@ -46,9 +46,10 @@ services:
 
 ### Single line command:
 
-1.  `mkdir /absolute/path/to/video_samples/`
-2.  `cp {$SOURCE_FILES} /absolute/path/to/video_samples/`
-3.  ```docker run -d --name ffserver-versatile \
+`mkdir /absolute/path/to/video_samples/`
+`cp {$SOURCE_FILES} /absolute/path/to/video_samples/`
+
+```docker run -d --name ffserver-versatile \
      --network host \
      -v /absolute/path/to/video_samples:/app/video_samples \
      -e LOG_LEVEL=DEBUG \
@@ -62,4 +63,4 @@ services:
      -e WORKERS_NUM=8 \
      daninoks/ffserver-versatile:v1 \
      sh -c "python3 /app/multithread_streamer.py"
-    ```
+```
