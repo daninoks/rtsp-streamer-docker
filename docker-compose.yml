@@ -1,20 +1,21 @@
 version: "3.0"
 services:
   postgres:
-    image: daninoks/ffserver-versatile:v1
+    image: ffserver-versatile:v1.1
     container_name: ffserver-versatile
     network_mode: "host"
     restart: always
     volumes:
       - ./video_samples:/app/video_samples
-      # - ./workspace:/app/workspace
+      - ./workspace:/app/workspace
     environment:
       - LOG_LEVEL=DEBUG
-      - NUM_COPIES=5
-      - SHIFT_INTERVAL=5
-      - OUTPUT_RESOLUTION=1920x1080
+      - NUM_COPIES=1
+      - SHIFT_INTERVAL=0
+      - SKIP_RESIZE=True
+      - RESIZE_RESOLUTION=1920x1080
       - ALLOWED_EXTENTIONS=mp4
       - WORKSPACE=/app/workspace
       - SOURCE_PATH=/app/video_samples
-      - WORKERS_NUM=8
+      - WORKERS_NUM_LIMIT=32
     command: sh -c "python3 /app/multithread_streamer.py"

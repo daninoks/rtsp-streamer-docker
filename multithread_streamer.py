@@ -8,18 +8,34 @@ import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
+#########################################################
+######################### TODO ##########################
+# 1. CUDA Acceleration (up to 8x speed-up)
+# 2. Each copy of provided video should be laucnhed on related 'Feed' not extra stream.
+# <Stream test>
+#     Format rtp
+#     File \"$test_video\"
+# </Stream>
 
+# <Stream test1>
+#     Format rtp
+#     File \"$test_video\"
+# </Stream>
+# 3.
 #########################################################
 ###################### Docker envs ######################
 env_num_copies = (
     int(os.environ.get("NUM_COPIES")) if os.environ.get("NUM_COPIES") else 1
 )
 env_shift_interval = (
-    int(os.environ.get("SHIFT_INTERVAL")) if os.environ.get("SHIFT_INTERVAL") else 5
+    int(os.environ.get("SHIFT_INTERVAL")) if os.environ.get("SHIFT_INTERVAL") else 1
 )
-env_output_resolution = (
-    os.environ.get("OUTPUT_RESOLUTION")
-    if os.environ.get("OUTPUT_RESOLUTION")
+env_skip_resize = (
+    bool(os.environ.get("SKIP_RESIZE")) if os.environ.get("SKIP_RESIZE") else False
+)
+env_resize_resolution = (
+    os.environ.get("RESIZE_RESOLUTION")
+    if os.environ.get("RESIZE_RESOLUTION")
     else "1920x1080"
 )
 env_allowed_extentions = (
@@ -35,15 +51,16 @@ env_source_path = (
     if os.environ.get("SOURCE_PATH")
     else "/app/video_samples"
 )
-env_workers_num = (
-    int(os.environ.get("WORKERS_NUM")) if os.environ.get("WORKERS_NUM") else 8
+env_workers_num_limit = (
+    int(os.environ.get("WORKERS_NUM_LIMIT"))
+    if os.environ.get("WORKERS_NUM_LIMIT")
+    else 32
 )
-env_log_level = os.environ.get("LOG_LEVEL") if os.environ.get("LOG_LEVEL") else "INFO"
+env_log_level = os.environ.get("LOG_LEVEL") if os.environ.get("LOG_LEVEL") else "DEBUG"
 #########################################################
 ######################## Logger #########################
 FORMAT = "%(asctime)s:%(levelname)s:%(message)s"
 DOCKER_FORMAT = "%(levelname)s : %(message)s"
-# "%(asctime)s %(clientip)-15s %(user)-8s %(message)s"
 logging.basicConfig(
     filename="ffserver-versatile.log",
     filemode="w",
@@ -55,13 +72,6 @@ consoleHandler = logging.StreamHandler(sys.stdout)  # set streamhandler to stdou
 consoleHandler.setFormatter(logging.Formatter(DOCKER_FORMAT))
 logger.addHandler(consoleHandler)
 
-# logger = logging.getLogger(__name__)
-# if not logging.getLogger().handlers:
-#     handler = logging.StreamHandler()
-#     formatter = logging.Formatter("%(name)s %(levelname)s %(message)s")
-#     handler.setFormatter(formatter)
-#     logger.addHandler(handler)
-
 # Set logging level:
 if "DEBUG" == env_log_level:
     logger.setLevel(logging.DEBUG)
@@ -69,6 +79,7 @@ elif "INFO" == env_log_level:
     logger.setLevel(logging.INFO)
 elif "WARN" or "WARNING" == env_log_level:
     logger.setLevel(logging.WARNING)
+#########################################################
 #########################################################
 
 
@@ -149,8 +160,9 @@ def shift_sample(
     source_path=env_source_path,
     workspace=env_workspace,
     num_copies=env_num_copies,
+    skip_resize=env_skip_resize,
     shift_interval=env_shift_interval,
-    output_resolution=env_output_resolution,
+    output_resolution=env_resize_resolution,
 ):
     """
     Create output video samples from input_files list, according to copies_num.
@@ -159,26 +171,48 @@ def shift_sample(
     logger.info(f"Input files: {input_files}")
     logger.info(f"Number of copies: {num_copies}")
     shifted_samples = []
+
     for input_file in input_files:
         logger.info(f"Processing {input_file}...")
         i = 1
         while i <= num_copies:
             output_file_naming = f"{input_file.split('.')[0]}_{i}.mp4"
             i += 1
-            proc = subprocess.Popen(
-                [
+
+            logger.debug(
+                f"Copying {source_path}/{input_file} into {workspace}/{output_file_naming} with FFmpeg"
+            )
+            if skip_resize:
+                logger.debug("RESIZE skipped...")
+                ffmpeg_command = [
                     "ffmpeg",
-                    "-y",
-                    "-i",
-                    f"{source_path}/{input_file}",
-                    "-ss",
-                    f"{shift_interval*i}",
-                    "-vf",
-                    f"scale={output_resolution}",
-                    "-c:a",
-                    "copy",
-                    f"{workspace}/{output_file_naming}",
-                ],
+                    "-y",  # overrites if file exist
+                    "-i",  # input file key
+                    f"{source_path}/{input_file}",  # input file path
+                    "-ss",  # shift key
+                    f"{shift_interval*i}",  # shift amount
+                    "-an",  # deletes audio
+                    "-c:v",  # quick copy key
+                    "copy",  # quick copy
+                    f"{workspace}/{output_file_naming}",  # output destenation/file.name
+                ]
+            else:
+                logger.debug("RESIZING...")
+                ffmpeg_command = [
+                    "ffmpeg",
+                    "-i",  # input file key
+                    f"{source_path}/{input_file}",  # input file path
+                    "-y",  # overrites if file exist
+                    "-ss",  # shift key
+                    f"{shift_interval*i}",  # shift amount
+                    "-vf",  # resize key
+                    f"scale={output_resolution}",  # resize scale
+                    "-an",  # deletes audio
+                    f"{workspace}/{output_file_naming}",  # output destenation/file.name
+                ]
+
+            proc = subprocess.Popen(
+                ffmpeg_command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 encoding="utf-8",
@@ -200,6 +234,8 @@ def shift_sample(
                     elif re.search(input_file, realtime_output):
                         logger.info(realtime_output.strip())
                         # print(f"WARN: {realtime_output.strip()}", flush=True, end="\r")
+                    else:
+                        logger.debug(realtime_output.strip())
 
     logger.info(f"Shifted ssamples list: {shifted_samples}")
     return shifted_samples
@@ -208,9 +244,9 @@ def shift_sample(
 def get_command_list(input_files: list, workspace=env_workspace):
     """Running multiple copies of ffserver"""
     command_list = []
+    shutil.copy("run_rtsp_multiport_streamer.sh", workspace)
+    logger.debug(f"'run_rtsp_multiport_streamer.sh' copied to {workspace}/")
     for item in input_files:
-        shutil.copy("run_rtsp_multiport_streamer.sh", workspace)
-        logger.debug(f"'run_rtsp_multiport_streamer.sh' copied to {workspace}/")
         command_list.append(f"./run_rtsp_multiport_streamer.sh {item}")
     return command_list
 
@@ -240,7 +276,9 @@ def run_command(command: str, workspace=env_workspace):
 
 
 def main(
-    source_path=env_source_path, workspace=env_workspace, workers_num=env_workers_num
+    source_path=env_source_path,
+    workspace=env_workspace,
+    workers_num_limit=env_workers_num_limit,
 ):
     """Main func info here"""
     try:
@@ -275,7 +313,7 @@ def main(
     commands = get_command_list(shifted_samples, workspace=workspace)
     logger.debug(f"Commads list : {commands}")
     # Create a thread pool worker threads
-    with ThreadPoolExecutor(max_workers=int(workers_num)) as executor:
+    with ThreadPoolExecutor(max_workers=int(workers_num_limit)) as executor:
         futures = []
         # Submit each command to the thread pool
         for cmd in commands:

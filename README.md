@@ -30,16 +30,17 @@ services:
     restart: always
     volumes:
       - ./video_samples:/app/video_samples
-      # - ./workspace:/app/workspace
+      - ./workspace:/app/workspace
     environment:
       - LOG_LEVEL=DEBUG
-      - NUM_COPIES=5
-      - SHIFT_INTERVAL=5
-      - OUTPUT_RESOLUTION=1920x1080
+      - NUM_COPIES=1
+      - SHIFT_INTERVAL=0
+      - SKIP_RESIZE=True
+      - RESIZE_RESOLUTION=1920x1080
       - ALLOWED_EXTENTIONS=mp4
       - WORKSPACE=/app/workspace
       - SOURCE_PATH=/app/video_samples
-      - WORKERS_NUM=8
+      - WORKERS_NUM_LIMIT=32
     command: sh -c "python3 /app/multithread_streamer.py"
 ```
 
@@ -53,6 +54,7 @@ services:
      -e LOG_LEVEL=DEBUG \
      -e NUM_COPIES=5 \
      -e SHIFT_INTERVAL=5 \
+     -e SKIP_RESIZE=True \
      -e OUTPUT_RESOLUTION=1920x1080 \
      -e ALLOWED_EXTENTIONS=mp4 \
      -e WORKSPACE=/app/workspace \

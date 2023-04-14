@@ -34,13 +34,13 @@ for ((port = $firstBroadcastPort; port <= $lastBroadcastPort; port++)); do
   allOuterPorts+=( $port )
   #allOuterPorts[${#allOuterPorts[@]}]=$port
 done
-echo "All Outer Ports:\n ${allOuterPorts[@]}"
+# echo "All Outer Ports:\n ${allOuterPorts[@]}"
 
 # Fill ports list:
 for ((port = $firstInternalPort; port <= $lastInternalPort; port++)); do
   allInerPorts+=( $port )
 done
-echo "All Inner Ports:\n ${allInerPorts[@]}"
+# echo "All Inner Ports:\n ${allInerPorts[@]}"
 
 # Check availiable ports:
 function innerPorts() {
@@ -97,7 +97,6 @@ FFSERVER_CMD="ffserver"
 configure_ffserver
 
 # Run stream:
-# server_ip=$(ip address | grep inet | grep /24 | awk '{print $2}' | sed 's/\/24//g')
 server_ip=$(hostname -I | awk '{print $1}')
 echo -e "Running RTSP streamer on (rtsp://${server_ip}:${freeOuterPort}/test)"
 $FFSERVER_CMD -f $ffserver_cfg
