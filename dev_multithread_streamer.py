@@ -104,7 +104,7 @@ for single_ext in env_allowed_extentions:
         sys.exit(1)
 #########################################################
 ###################### Dev Mode #########################
-DEV_MODE = False
+DEV_MODE = True
 if DEV_MODE:
     workspace_dir = "/home/demo/automation/workspace"
     source_dir = "/home/demo/automation/video_samples"
@@ -304,11 +304,18 @@ def shift_sample(
                     "-an",  # deletes audio
                     "-r",  # select desired fps
                     f"{output_framerate}",  # select desired fps
-                    "-vcodec",  # select codec
-                    "libx264"  # H.264
+                    # "-vcodec",  # select codec
+                    # "libx264"  # H.264
                     f"{workspace}/{output_file_naming}",  # output destenation/file.name
                 ]
 
+            # proc = subprocess.Popen(
+            #     ffmpeg_command,
+            #     stdout=subprocess.PIPE,
+            #     stderr=subprocess.STDOUT,
+            #     encoding="utf-8",
+            #     errors="replace",
+            # )
             with subprocess.Popen(
                 ffmpeg_command,
                 stdout=subprocess.PIPE,
@@ -457,6 +464,9 @@ RTSPBindAddress 0.0.0.0
     with open(os.path.join(workspace, config_name), "w") as ffs_conf_file:
         ffs_conf_file.write(config_content)
     return config_name, config_content, rtsp_port
+
+
+# create_ffserver_conf(videos_samples, internal_ports, external_ports)
 
 
 def main(

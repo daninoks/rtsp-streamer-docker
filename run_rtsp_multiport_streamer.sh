@@ -17,8 +17,10 @@ done
 
 # Ports list:
 # Change lower ports and port range here:
-firstBroadcastPort=50000
-firstInternalPort=51000
+# firstBroadcastPort=50000
+# firstInternalPort=51000
+firstBroadcastPort=40000
+firstInternalPort=41000
 portsRange=30
 
 # Max port value calculate:
@@ -76,7 +78,7 @@ HTTPPort $freeInerPort
 HTTPBindAddress 0.0.0.0
 MaxHTTPConnections 2000
 MaxClients 1000
-MaxBandwidth 5000000
+MaxBandwidth 10000
 CustomLog -
 
 RTSPPort $freeOuterPort
@@ -86,9 +88,15 @@ RTSPBindAddress 0.0.0.0
     Format rtp
     File \"$test_video\"
 </Stream>
+
+<Stream status.html>
+    Format status
+    ACL allow localhost
+    ACL allow 192.168.0.0 192.168.255.255
+</Stream>
 " > $ffserver_cfg
 }
-
+# previous MaxBandwidth 5000000
 # MAIN functionality
 FFSERVER_CMD="ffserver"
 

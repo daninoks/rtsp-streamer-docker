@@ -27,7 +27,10 @@ RUN rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Copy local files to workdir:
-COPY run_rtsp_multiport_streamer.sh multithread_streamer.py /app/
+COPY multithread_streamer.py /app/
 RUN chmod -R +x /app/
-# Builder succes message:
-CMD echo 'BuildDone!'
+
+# Command on launch that can be overwriten:
+CMD [ "rm", "-rf", "/app/workspace/*" ]
+# Command on launch that can't be overwriten:
+ENTRYPOINT [ "python3", "/app/multithread_streamer.py" ]
