@@ -441,10 +441,13 @@ RTSPBindAddress 0.0.0.0
     ACL allow 0.0.0.0 255.255.255.255
 </Stream>"""
 
+    broadcast_num = 0
     for vid_file in videos_samples:
         # Only file name:
         vid_file_naming_ext = os.path.basename(vid_file)
-        vid_file_naming = os.path.basename(vid_file).split(".")[0]
+        # vid_file_naming = os.path.basename(vid_file).split(".")[0]
+        vid_file_naming = broadcast_num
+        broadcast_num += 1
 
         ffserver_streams_conf += ffserver_streams_patern.format(
             feed_name=vid_file_naming_ext,
