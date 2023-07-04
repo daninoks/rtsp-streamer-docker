@@ -536,9 +536,12 @@ FFserver config: \n
     )
 
     broadcast_urls = """!!! Please make sure there are no WARNINGS/ERRORS below this message !!! \n\nRTSP URLS:\n"""
+    sample_counter = 0
     for sample_full_name in shifted_samples:
         sample_name = sample_full_name.split(".")[0]
-        broadcast_urls += f"{broadcast_url}/str_{sample_name}\n"
+        # broadcast_urls += f"{broadcast_url}/str_{sample_name}\n"
+        broadcast_urls += f"{broadcast_url}/str_{sample_counter}\n"
+        sample_counter += 1
     logger.info(broadcast_urls)
 
     with subprocess.Popen(

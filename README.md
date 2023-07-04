@@ -111,6 +111,12 @@ services:
 
 ## Changelog:
 
+### ffserver-versatile:v1.3.1
+
+- Now streams naming is static instead of dynamic in 1.3
+
+`rtsp://192.123.123.123:41000/str_<vide_file_naming>_<copy_index>  >>>  rtsp://192.123.123.123:41000/str_<stream_index>`
+
 ### ffserver-versatile:v1.3
 
 - FFserver structure changed: now container launching single FFserver instance with multiple streams.

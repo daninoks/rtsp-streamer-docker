@@ -1,7 +1,7 @@
 version: "3.0"
 services:
-  postgres:
-    image: f
+  ffserver-broadcast:
+    image: daninoks/ffserver-versatile:v1.3.1
     container_name: ffserver-versatile-dev
     network_mode: "host"
     # restart: always
@@ -12,7 +12,7 @@ services:
       - LOG_LEVEL=DEBUG
       - INERNAL_PORTS=40000,30000,30001,30002
       - EXTERNAL_PORTS=41000,31000,31001,31002
-      - NUM_COPIES=1
+      - NUM_COPIES=2
       - SHIFT_INTERVAL=0
       - FRAME_RATE=30
       - EACH_STREAM_MAX_BANDWIDTH=10000
