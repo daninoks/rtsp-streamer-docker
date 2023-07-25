@@ -111,6 +111,19 @@ services:
 
 ## Changelog:
 
+### ffserver-versatile:v2.0.0
+
+- System config moved from 'docker-compose.yml' environment section to 'modules_config.toml'
+- Now streamer support any number of sub directories. All preferences can be controlled in modules->module_name:
+  ```
+  vid_samples_source_prefix = "source_directory_under_{vid_samples_source}"
+  vid_samples_workspace_prefix = "workspace_directory_under_{vid_samples_workspace}"
+  stream_url_prefix = "any_prefix_to switch_between_modules"
+  ```
+- Broadcasting now happens from single server.
+  New URLs format:
+  `rtsp://<host*ip>:<external_port_from_range>/str_<stream_url_prefix>_<stream_index>`
+
 ### ffserver-versatile:v1.3.1
 
 - Now streams naming is static instead of dynamic in 1.3
