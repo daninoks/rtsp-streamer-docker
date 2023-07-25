@@ -20,6 +20,8 @@ RUN cd ffmpeg && \
     make -j4 && \
     mv ffserver /bin/ffserver
 
+RUN apt-get install python3-pip -y && pip install tomli
+
 # Empty apt list:
 RUN rm -rf /var/lib/apt/lists/*
 
@@ -27,7 +29,9 @@ RUN rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 # Copy local files to workdir:
-COPY multithread_streamer.py /app/
+COPY multithread_streamer.py  /app/
+COPY modules_config.toml /app/config/
+
 RUN chmod -R +x /app/
 
 # Command on launch that can be overwriten:

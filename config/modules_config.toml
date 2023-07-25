@@ -1,0 +1,47 @@
+# This is a TOML document.
+# Indentation (tabs and/or spaces) is allowed but not required.
+# More info can be found in official documentation:
+# https://docs.python.org/3/library/tomllib.html
+
+
+[general]
+ # Settings wich can be freely chanaged by user:
+internal_port_range = [40000, 40001, 40002]
+external_port_range = [41000, 41001, 41002]
+allowed_vid_extentions = [".mp4"]
+each_stream_max_bandwidth = 10000
+vid_samples_source = "video_samples"
+vid_samples_workspace = "workspace"
+
+    [general.docker]
+    project_dir = "/app"
+    [general.developer]
+    project_dir = "/home/demopc/automation"
+
+
+[modules]
+ # new modules can be added in this section
+ # should be under 'modules' -> '[modules.moduel_name]'
+    [modules.ads]
+    source_files = []                       # MANDATORY FIELD: EMPTY LIST
+    shifted_files = []                      # MANDATORY FIELD: EMPTY LIST
+    vid_samples_source_prefix = "ads"
+    vid_samples_workspace_prefix = "ads_sfds"
+    stream_url_prefix = "ads_smoke"
+    copies_number = 5                       # sample will be copied as it is according
+    shift_interval = 5                      # to 'copies_number' if shift_interval = 0 
+    skip_resize = false
+    resize_resolution = "1920x1080"         # will be skipped if skip_resize = true
+    frame_rate = 30
+
+    [modules.frs]
+    source_files = []                       # MANDATORY FIELD: EMPTY LIST
+    shifted_files = []                      # MANDATORY FIELD: EMPTY LIST    
+    vid_samples_source_prefix = "frs"
+    vid_samples_workspace_prefix = "frs"
+    stream_url_prefix = "frs"
+    copies_number = 10                       # sample will be copied as it is according
+    shift_interval = 1                      # to 'copies_number' if shift_interval = 0 
+    skip_resize = true
+    resize_resolution = "1920x1080"     # will be skipped if skip_resize = true
+    frame_rate = 30

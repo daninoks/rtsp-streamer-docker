@@ -1,22 +1,24 @@
 version: "3.0"
 services:
   ffserver-broadcast:
-    image: daninoks/ffserver-versatile:v1.3.1
+    image: daninoks/ffserver-versatile:v2.0.0
     container_name: ffserver-versatile-dev
     network_mode: "host"
-    # restart: always
+    restart: always
     volumes:
       - ./video_samples:/app/video_samples
       - ./workspace:/app/workspace
+      - ./config:/app/config
     environment:
       - LOG_LEVEL=DEBUG
-      - INERNAL_PORTS=40000,30000,30001,30002
-      - EXTERNAL_PORTS=41000,31000,31001,31002
-      - NUM_COPIES=2
-      - SHIFT_INTERVAL=0
-      - FRAME_RATE=30
-      - EACH_STREAM_MAX_BANDWIDTH=10000
-      - SKIP_RESIZE=False
-      - RESIZE_RESOLUTION=1920x1080
-      - ALLOWED_EXTENTIONS=.mp4
-      - WORKERS_NUM_LIMIT=32
+      # # # # Version <= 1.3.1 envs: # # # #
+      # - INERNAL_PORTS=40000,30000,30001,30002
+      # - EXTERNAL_PORTS=41000,31000,31001,31002
+      # - NUM_COPIES=2
+      # - SHIFT_INTERVAL=0
+      # - FRAME_RATE=30
+      # - EACH_STREAM_MAX_BANDWIDTH=10000
+      # - SKIP_RESIZE=False
+      # - RESIZE_RESOLUTION=1920x1080
+      # - ALLOWED_EXTENTIONS=.mp4
+      # - WORKERS_NUM_LIMIT=32
