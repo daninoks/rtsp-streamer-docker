@@ -13,6 +13,8 @@
 >
 > - Logging level. Select 'DEBUG' for more detailed output.
 
+> **DEPRICATED:**
+
 > INERNAL_PORTS {'1,2,3,...', '5000,5002,...'}
 >
 > - List from which ports will be checked one by one, if any of is free - it will be used as HTTP port, for video samples input.
@@ -49,8 +51,6 @@
 > - WORKERS_NUM {32}
 > - Workers amount. Should be >= number of streams[video_samples_num*copies_num] and <= number of threads available on your work station.
 
-> **DEPRICATED:**
->
 > - WORKSPACE {str: default workspace for ffmpeg/ffserver operations}
 > - SOURCE_PATH {str: default input source directory}
 
@@ -107,6 +107,24 @@ services:
       - RESIZE_RESOLUTION=1920x1080
       - ALLOWED_EXTENTIONS=.mp4
       - WORKERS_NUM_LIMIT=32
+```
+
+## v.2.0.0
+
+```
+version: "3.0"
+services:
+  ffserver-broadcast:
+    image: daninoks/ffserver-versatile:v2.0.0
+    container_name: ffserver-versatile-dev
+    network_mode: "host"
+    restart: always
+    volumes:
+      - ./video_samples:/app/video_samples
+      - ./workspace:/app/workspace
+      - ./config:/app/config
+    environment:
+      - LOG_LEVEL=DEBUG
 ```
 
 ## Changelog:
